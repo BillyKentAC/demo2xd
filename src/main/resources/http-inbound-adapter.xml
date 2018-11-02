@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:int="http://www.springframework.org/schema/integration"
+       xmlns:int-http="http://www.springframework.org/schema/integration/http"
+       xsi:schemaLocation="
+    http://www.springframework.org/schema/beans
+    http://www.springframework.org/schema/beans/spring-beans.xsd
+    http://www.springframework.org/schema/integration
+    http://www.springframework.org/schema/integration/spring-integration.xsd
+    http://www.springframework.org/schema/integration/http
+    http://www.springframework.org/schema/integration/http/spring-integration-http.xsd">
+
+    <!-- ////////////// -->
+    <!-- POST  REQUESTS -->
+    <!-- ////////////// -->
+    <int:channel id="outputChannel"/>
+    <int:channel id="httpPostChannel"/>
+
+    <!-- gateway de entrada para recibir peticiones POST -->
+    <!--
+        Recibe la petición y la envía al canal httpPostChannel
+        Define el canala de respuesta outputChannel
+    -->
+
+    <int-http:inbound-gateway
+            id="customers"
+            request-channel="httpPostChannel"
+            reply-channel="outputChannel"
+            supported-methods="POST"
+            mapped-request-headers="HTTP_REQUEST_HEADERS"
+            path="/clientesaldo">
+        <int-http:request-mapping produces="application/json" consumes="application/json"/>
+    </int-http:inbound-gateway>
+
+    <!--
+        Recibe la peticion post por el canal httpPostChannel y efectua el metodo pagarAlbanco
+        del bean demoService.
+        El resultado lo envía al canal get_send_channel
+    -->
+    <int:service-activator ref="demoService" method="pagarAlbanco"
+                           input-channel="httpPostChannel" output-channel="get_send_channel"/>
+
+
+    <!-- Recibe el mensaje de get_receive_channel, osea la respuesta del banco -->
+    <!-- Convertimos el string de respuesta a un objeto del tipo consulta reply -->
+    <int:json-to-object-transformer input-channel="get_receive_channel"
+                                    output-channel="evaluarPagoChannel"
+                                    type="com.miedosoft.interactive.model.ConsultaBancoReply">
+        <int:poller default="true" fixed-delay="50"/>
+    </int:json-to-object-transformer>
+
+    <int:channel id="evaluarPagoChannel"/>
+    <int:service-activator input-channel="evaluarPagoChannel" ref="demoService" method="evaluarRespuesta"
+                           output-channel="outputChannel"/>
+
+
+</beans>

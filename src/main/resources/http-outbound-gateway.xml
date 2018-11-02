@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:int="http://www.springframework.org/schema/integration"
+       xmlns:int-http="http://www.springframework.org/schema/integration/http"
+
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/integration
+       http://www.springframework.org/schema/integration/spring-integration.xsd
+       http://www.springframework.org/schema/integration/http
+       http://www.springframework.org/schema/integration/http/spring-integration-http.xsd">
+
+    <!-- Canal para enviar mensajes -->
+    <int:channel id="get_send_channel"/>
+
+    <!-- Canal intermedio -->
+    <int:channel id="intermedio"/>
+
+    <!-- Canal para recibir mensajes con una capacidad de cola de 10 -->
+    <int:channel id="get_receive_channel">
+        <int:queue capacity="10"/>
+    </int:channel>
+
+    <!--
+        Enriquecedor de mensajes, añade el header contentType al mensaje y lo
+        envía al canal intermedio
+     -->
+    <int:header-enricher input-channel="get_send_channel" output-channel="intermedio">
+        <int:header name="contentType" value="application/json"/>
+    </int:header-enricher>
+
+
+    <!--
+        Gateway de salida que efectúa una petición post al banco.
+        Recibe mensajes del canal intermedio y arroja los resultados de la consulta
+        al banco al canal get_receive_channel.
+    -->
+    <int-http:outbound-gateway id="get.outbound.gateway"
+                               request-channel="intermedio"
+                               url="http://localhost:8080/pago"
+                               http-method="POST"
+                               reply-channel="get_receive_channel"
+                               expected-response-type="java.lang.String"/>
+
+</beans>
